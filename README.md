@@ -8,8 +8,8 @@ A hands-on LangChain project exploring different agent patterns using OpenAI and
 
 ```
 langchain-course/
-├── main.py            # Classic tool-calling agent (AgentExecutor pattern)
-├── search-agent.py    # Modern structured-output agent (create_agent pattern)
+├── main.py            # Simple agent — plain text output (create_agent, LangChain 1.x)
+├── search-agent.py    # Structured output agent — typed Pydantic response with sources
 ├── pyproject.toml     # Dependencies
 └── README.md
 ```
@@ -35,33 +35,33 @@ uv sync
 
 ## Agent Implementations
 
-### `main.py` — Classic Tool-Calling Agent
+### `main.py` — Simple Agent (Plain Text Output)
 
-Uses the **`create_tool_calling_agent` + `AgentExecutor`** pattern — the stable, widely-documented LangChain API.
+Uses the **`create_agent`** API introduced in **LangChain 1.x** — the current standard, replacing the old `AgentExecutor` pattern.
+
+> **Note:** `AgentExecutor` and `create_tool_calling_agent` were removed in LangChain 1.x. `create_agent` is now the unified entry point for all agent types.
 
 **How it works:**
 
 ```
-ChatPromptTemplate (system + human + scratchpad)
+create_agent(model=llm, tools=tools)
         ↓
-create_tool_calling_agent(llm, tools, prompt)
+agent.invoke({"messages": [HumanMessage(...)]})
         ↓
-AgentExecutor.invoke({"input": "..."})
-        ↓
-{"output": "plain text answer"}
+result["messages"][-1].content  →  plain text answer
 ```
 
 **Key characteristics:**
-- You manually define the **system prompt**, the user message slot (`{input}`), and the **agent scratchpad** — the memory slot where tool call/result history is stored between reasoning steps.
-- `AgentExecutor` drives the reasoning loop: LLM decides to call a tool → tool runs → result is fed back → LLM reasons again → repeats until it returns a final answer.
-- Output is a **plain string** inside `result["output"]`.
+- Uses the **message-based interface** (`HumanMessage`) — consistent with the rest of the LangChain/LangGraph ecosystem.
+- No prompt template needed — the agent handles tool descriptions internally.
+- Output is a **plain string** extracted from the last message in the response.
 - Agent is scoped **inside `main()`** — clean, no global state, easy to test.
 - Uses `gpt-4o-mini` — cost-efficient and widely available.
 
 **When to use:**
-- Learning LangChain agent concepts.
-- When you need full control over the prompt.
-- Freeform conversational answers where plain text is fine.
+- Getting started with LangChain 1.x agents.
+- Freeform conversational answers where plain text output is sufficient.
+- Lightweight scripts that don't need structured/typed responses.
 
 ---
 
@@ -99,23 +99,33 @@ AgentResponse(answer="...", sources=[Source(url="..."), ...])
 
 | Aspect | `main.py` | `search-agent.py` |
 |---|---|---|
-| Agent API | `create_tool_calling_agent` + `AgentExecutor` | `create_agent` with `response_format` |
-| Prompt | Explicit `ChatPromptTemplate` | Implicit (handled internally) |
-| Output type | Plain string | Pydantic model (`answer` + `sources`) |
+| Agent API | `create_agent` (LangChain 1.x) | `create_agent` with `response_format` |
+| Prompt | Implicit (handled internally) | Implicit (handled internally) |
+| Input format | `{"messages": [HumanMessage(...)]}` | `{"messages": HumanMessage(...)}` |
+| Output type | Plain string (last message content) | Pydantic model (`answer` + `sources`) |
 | Model | `gpt-4o-mini` | `gpt-5` |
 | Agent scope | Inside function (clean) | Module-level global |
-| Boilerplate | More explicit | Less boilerplate |
-| Best for | Learning, flexible prompting | Production, structured output |
+| Boilerplate | Minimal | Minimal + Pydantic schemas |
+| Best for | Simple queries, learning | Production, APIs, structured output |
 
 ---
 
 ## Why Two Different Approaches?
 
+Both files now use the **same `create_agent` API** (LangChain 1.x). The difference is purely about **output shape**:
+
 | Reason | Explanation |
 |---|---|
-| **LangChain evolution** | `create_tool_calling_agent` + `AgentExecutor` is the **legacy stable API**. `create_agent` with `response_format` is the **newer high-level API** built on LangGraph. |
-| **Use case** | `main.py` is better for freeform conversational answers. `search-agent.py` is better when you need predictable, parseable output. |
-| **Explicitness vs convenience** | `main.py` gives full control over the prompt. `search-agent.py` trades control for less boilerplate. |
+| **Output format** | `main.py` returns a plain string — simple and fast. `search-agent.py` returns a typed Pydantic object with `answer` + `sources`. |
+| **Use case** | `main.py` is for quick queries where text output is enough. `search-agent.py` is for applications that need structured, validated, parseable data. |
+| **Complexity** | `main.py` has zero schema overhead. `search-agent.py` requires defining Pydantic models but gives you type safety and source citations in return. |
+
+### LangChain API Migration History
+
+```
+LangChain <1.x   →   create_tool_calling_agent + AgentExecutor  (removed)
+LangChain 1.x    →   create_agent (unified API, LangGraph-backed)
+```
 
 ---
 
@@ -123,7 +133,7 @@ AgentResponse(answer="...", sources=[Source(url="..."), ...])
 
 **Use `search-agent.py`'s pattern for production** — structured output with typed sources is far more useful when building real applications (no string parsing, type safety, includes citations).
 
-**Use `main.py`'s pattern for learning and custom prompting** — it's explicit, easy to debug, and matches most LangChain tutorials and documentation.
+**Use `main.py`'s pattern when plain text output is enough** — minimal setup, uses the current LangChain 1.x API, great for scripts and quick prototypes.
 
 > **Note:** Two known improvements for `search-agent.py`:
 > 1. Move the agent initialization inside `main()` to avoid global state.

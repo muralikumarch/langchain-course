@@ -36,7 +36,7 @@ def main():
     result = agent.invoke(
         {
             "messages": HumanMessage(
-                content="search for 3 job postings for an ai engineer using langchain in the bay area on linkedin and list their details?"
+                content="search for 3 job postings for an ai engineer using langchain in the Hyderabad, India area on linkedin and list their details?"
             )
         }
     )
